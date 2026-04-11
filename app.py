@@ -11,7 +11,7 @@ if os.environ.get("RACE_PREDICTOR_DEBUG"):
 
 # Local imports
 from utils.strava import build_auth_url, exchange_code_for_token, ensure_token, list_activities
-from utils.persistence import load_saved_app_creds, save_app_creds, forget_app_creds, load_pace_model_from_disk, save_pace_model_to_disk, load_excluded_race_ids
+from utils.persistence import get_app_creds, load_pace_model_from_disk, save_pace_model_to_disk, load_excluded_race_ids
 from utils.pace_builder import build_pace_curves_from_races
 from utils.display import (
     display_course_details, display_segments_overview,
@@ -51,14 +51,13 @@ def handle_oauth_callback():
         return
 
     code = qs["code"]
-    saved = load_saved_app_creds(config.APP_CREDS_PATH)
-    client_id = saved.get("client_id", "")
-    client_secret = saved.get("client_secret", "")
+    creds = get_app_creds()
+    client_id = creds.get("client_id", "")
+    client_secret = creds.get("client_secret", "")
 
     if client_id and client_secret:
         try:
             exchange_code_for_token(client_id, client_secret, code)
-            save_app_creds(client_id, client_secret, config.DATA_DIR, config.APP_CREDS_PATH)
             st.success("Strava connected ✅")
             st.query_params.clear()
         except Exception as e:
@@ -175,29 +174,18 @@ tab_race, tab_data = st.tabs(["🏁 Upcoming race", "📚 My data"])
 # --- Sidebar ---
 with st.sidebar:
     st.header("1. Strava Connection")
-    saved = load_saved_app_creds(config.APP_CREDS_PATH)
-    client_id = st.text_input("Client ID", value=saved.get("client_id", ""))
-    client_secret = st.text_input("Client Secret", type="password", value=saved.get("client_secret", ""))
+    creds = get_app_creds()
+    client_id = creds.get("client_id", "")
+    client_secret = creds.get("client_secret", "")
 
     tokens = ensure_token(client_id, client_secret)
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if tokens:
-            st.success("Connected ✅")
-        elif client_id and client_secret:
-            st.link_button("Connect", url=build_auth_url(client_id, "http://localhost:8501"))
-
-    with col2:
-        if st.button("Save creds", disabled=not (client_id and client_secret)):
-            save_app_creds(client_id, client_secret, config.DATA_DIR, config.APP_CREDS_PATH)
-            st.success("Saved!")
-
-    with col3:
-        if st.button("Forget creds"):
-            forget_app_creds(config.APP_CREDS_PATH)
-            st.success("Forgotten!")
-            st.rerun()
+    if tokens:
+        st.success("Connected ✅")
+    elif client_id and client_secret:
+        st.link_button("Connect Strava", url=build_auth_url(client_id, "http://localhost:8501"))
+    else:
+        st.warning("Strava credentials not configured.")
 
     st.header("2. Build Pace Model")
     recency_mode = st.select_slider("Recency Weighting", ["off", "mild", "medium"], value="mild")

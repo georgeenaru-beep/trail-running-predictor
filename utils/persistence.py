@@ -54,6 +54,25 @@ def load_pace_model_from_disk():
         print(f"Error loading pace model from disk: {e}")
         return None
 
+def get_app_creds() -> dict:
+    """
+    Return Strava app credentials without ever exposing them in the UI.
+    Reads from st.secrets first (Streamlit Cloud / secrets.toml),
+    then falls back to environment variables / .env file.
+    """
+    try:
+        client_id = st.secrets.get("STRAVA_CLIENT_ID", "")
+        client_secret = st.secrets.get("STRAVA_CLIENT_SECRET", "")
+        if client_id and client_secret:
+            return {"client_id": str(client_id), "client_secret": str(client_secret)}
+    except Exception:
+        pass
+    return {
+        "client_id": os.environ.get("STRAVA_CLIENT_ID", ""),
+        "client_secret": os.environ.get("STRAVA_CLIENT_SECRET", ""),
+    }
+
+
 def load_saved_app_creds(app_credits_path: str):
     try:
         with open(app_credits_path, "r") as f:
@@ -62,12 +81,7 @@ def load_saved_app_creds(app_credits_path: str):
             return data
     except Exception:
         pass
-    # Fall back to environment variables (e.g. from .env)
-    env_id = os.environ.get("STRAVA_CLIENT_ID", "")
-    env_secret = os.environ.get("STRAVA_CLIENT_SECRET", "")
-    if env_id or env_secret:
-        return {"client_id": env_id, "client_secret": env_secret}
-    return {}
+    return get_app_creds()
 
 def save_app_creds(client_id: str, client_secret: str, data_dir: str, app_credits_path: str):
     os.makedirs(data_dir, exist_ok=True)
