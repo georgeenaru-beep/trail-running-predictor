@@ -61,12 +61,13 @@ def get_app_creds() -> dict:
     then falls back to environment variables / .env file.
     """
     try:
-        client_id = st.secrets.get("STRAVA_CLIENT_ID", "")
-        client_secret = st.secrets.get("STRAVA_CLIENT_SECRET", "")
-        if client_id and client_secret:
-            return {"client_id": str(client_id), "client_secret": str(client_secret)}
+        client_id = st.secrets["STRAVA_CLIENT_ID"]
+        client_secret = st.secrets["STRAVA_CLIENT_SECRET"]
+        return {"client_id": str(client_id), "client_secret": str(client_secret)}
+    except KeyError:
+        pass  # keys not present in st.secrets — try env vars
     except Exception:
-        pass
+        pass  # st.secrets unavailable (no secrets.toml locally) — try env vars
     return {
         "client_id": os.environ.get("STRAVA_CLIENT_ID", ""),
         "client_secret": os.environ.get("STRAVA_CLIENT_SECRET", ""),
