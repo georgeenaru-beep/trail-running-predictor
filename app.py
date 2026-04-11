@@ -45,7 +45,18 @@ def get_course_from_session(aid_km_text: str, aid_units: str):
 
 
 def get_redirect_uri() -> str:
-    """Build the OAuth redirect URI from the current request host."""
+    """Return the OAuth redirect URI.
+    Checks REDIRECT_URI secret/env var first, then falls back to
+    auto-detecting from the request host."""
+    try:
+        uri = st.secrets.get("REDIRECT_URI", "")
+        if uri:
+            return str(uri)
+    except Exception:
+        pass
+    uri = os.environ.get("REDIRECT_URI", "")
+    if uri:
+        return uri
     try:
         host = st.context.headers.get("host", "localhost:8501")
         protocol = "http" if host.startswith("localhost") else "https"
