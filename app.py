@@ -44,6 +44,16 @@ def get_course_from_session(aid_km_text: str, aid_units: str):
     return st.session_state.get("course")
 
 
+def get_redirect_uri() -> str:
+    """Build the OAuth redirect URI from the current request host."""
+    try:
+        host = st.context.headers.get("host", "localhost:8501")
+        protocol = "http" if host.startswith("localhost") else "https"
+        return f"{protocol}://{host}"
+    except Exception:
+        return "http://localhost:8501"
+
+
 def handle_oauth_callback():
     """Handle OAuth callback from Strava."""
     qs = st.query_params
@@ -183,7 +193,7 @@ with st.sidebar:
     if tokens:
         st.success("Connected ✅")
     elif client_id and client_secret:
-        st.link_button("Connect Strava", url=build_auth_url(client_id, "http://localhost:8501"))
+        st.link_button("Connect Strava", url=build_auth_url(client_id, get_redirect_uri()))
     else:
         st.warning("Strava credentials not configured.")
         with st.expander("🔍 Debug: secrets diagnostic"):
