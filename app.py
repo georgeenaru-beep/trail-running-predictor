@@ -186,6 +186,13 @@ with st.sidebar:
         st.link_button("Connect Strava", url=build_auth_url(client_id, "http://localhost:8501"))
     else:
         st.warning("Strava credentials not configured.")
+        with st.expander("🔍 Debug: secrets diagnostic"):
+            try:
+                keys = list(st.secrets.keys())
+                st.write("Keys found in st.secrets:", keys)
+            except Exception as e:
+                st.write(f"st.secrets unavailable: {type(e).__name__}: {e}")
+            st.write("STRAVA_CLIENT_ID in env:", bool(os.environ.get("STRAVA_CLIENT_ID")))
 
     st.header("2. Build Pace Model")
     recency_mode = st.select_slider("Recency Weighting", ["off", "mild", "medium"], value="mild")
