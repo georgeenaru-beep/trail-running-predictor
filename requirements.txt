@@ -7,3 +7,4 @@ matplotlib>=3.10
 folium>=0.14
 streamlit-folium>=0.15
 scipy>=1.17.0
+python-dotenv>=1.0

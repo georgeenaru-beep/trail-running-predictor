@@ -8,6 +8,9 @@ import pandas as pd
 from pathlib import Path
 import streamlit as st
 import config
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def save_pace_model_to_disk(pace_model):
     """
@@ -51,12 +54,20 @@ def load_pace_model_from_disk():
         print(f"Error loading pace model from disk: {e}")
         return None
 
-def load_saved_app_creds( app_credits_path: str):
+def load_saved_app_creds(app_credits_path: str):
     try:
         with open(app_credits_path, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+        if data.get("client_id") and data.get("client_secret"):
+            return data
     except Exception:
-        return {}
+        pass
+    # Fall back to environment variables (e.g. from .env)
+    env_id = os.environ.get("STRAVA_CLIENT_ID", "")
+    env_secret = os.environ.get("STRAVA_CLIENT_SECRET", "")
+    if env_id or env_secret:
+        return {"client_id": env_id, "client_secret": env_secret}
+    return {}
 
 def save_app_creds(client_id: str, client_secret: str, data_dir: str, app_credits_path: str):
     os.makedirs(data_dir, exist_ok=True)
