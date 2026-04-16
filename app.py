@@ -10,7 +10,7 @@ if os.environ.get("RACE_PREDICTOR_DEBUG"):
     logging.getLogger("prediction").setLevel(logging.DEBUG)
 
 # Local imports
-from utils.strava import build_auth_url, exchange_code_for_token, ensure_token, list_activities
+from utils.strava import build_auth_url, exchange_code_for_token, ensure_token, list_activities, compute_hr_threshold
 from utils.persistence import get_app_creds, load_pace_model_from_disk, save_pace_model_to_disk, load_excluded_race_ids
 from utils.pace_builder import build_pace_curves_from_races
 from utils.display import (
@@ -225,11 +225,14 @@ with st.sidebar:
     if st.button("Build from my Strava races", disabled=not tokens):
         with st.spinner("Fetching races and building model..."):
             acts = list_activities(tokens["access_token"])
+            if "hr_threshold" not in st.session_state:
+                st.session_state.hr_threshold = compute_hr_threshold(acts)
             pace_df, used_df, meta = build_pace_curves_from_races(
                 tokens["access_token"], acts, config.GRADE_BINS,
                 max_activities=config.MAX_ACTIVITIES, recency_mode=recency_mode,
                 excluded_ids=st.session_state.excluded_race_ids,
                 include_hard_training=include_hard_training,
+                hr_threshold=st.session_state.hr_threshold,
             )
             st.session_state.pace_model = PaceModel(pace_df, used_df, meta)
             save_pace_model_to_disk(st.session_state.pace_model)

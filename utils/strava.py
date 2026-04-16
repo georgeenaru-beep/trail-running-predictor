@@ -1,10 +1,15 @@
+import logging
 import os
 import time
 import json
+import numpy as np
 import requests
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 from urllib.parse import urlencode
 import config
+
+log = logging.getLogger(__name__)
 
 os.makedirs(config.CACHE_DIR, exist_ok=True)
 
@@ -110,15 +115,57 @@ def is_race(a: Dict[str, Any]) -> bool:
     return a.get("workout_type") == 1
 
 
-def is_hard_effort(a: Dict[str, Any]) -> bool:
-    """True if activity is a long run (2), workout (3), has avg HR > 150, or suffer score > 50."""
+def is_hard_effort(a: Dict[str, Any], hr_threshold: int = 150) -> bool:
+    """True if activity is a long run (2), workout (3), has avg HR above threshold, or suffer score > 50."""
     if a.get("workout_type") in (2, 3):
         return True
-    if (a.get("average_heartrate") or 0) > 150:
+    if (a.get("average_heartrate") or 0) > hr_threshold:
         return True
     if (a.get("suffer_score") or 0) > 50:
         return True
     return False
+
+
+def compute_hr_threshold(
+        activities: List[Dict[str, Any]],
+        fallback: int = 150,
+        min_activities: int = 10,
+        percentile: float = 70.0,
+) -> int:
+    """Return the personalised HR threshold for hard-effort detection.
+
+    Computes the given percentile of average_heartrate across all runs
+    from the last 3 months. Falls back to `fallback` when fewer than
+    `min_activities` runs have HR data.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=91)
+    hr_values = []
+    for a in activities:
+        if not is_run(a):
+            continue
+        try:
+            dt = datetime.fromisoformat(a.get("start_date", "").replace("Z", "+00:00"))
+            if dt < cutoff:
+                continue
+        except (ValueError, AttributeError):
+            continue
+        hr = a.get("average_heartrate")
+        if hr and hr > 0:
+            hr_values.append(float(hr))
+
+    if len(hr_values) < min_activities:
+        log.info(
+            "HR threshold: only %d run(s) with HR data in last 3 months (need %d) — using fallback %d bpm",
+            len(hr_values), min_activities, fallback,
+        )
+        return fallback
+
+    threshold = int(np.percentile(hr_values, percentile))
+    log.info(
+        "HR threshold: %.0fth percentile of %d runs = %d bpm",
+        percentile, len(hr_values), threshold,
+    )
+    return threshold
 
 def get_activity_streams(access_token: str, activity_id: int, types=None) -> Dict[str, Any]:
     if types is None:

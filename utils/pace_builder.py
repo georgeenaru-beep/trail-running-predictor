@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Tuple
 #local imports
-from utils.strava import get_activity_streams, is_run, is_race, is_hard_effort
+from utils.strava import get_activity_streams, is_run, is_race, is_hard_effort, compute_hr_threshold
 from utils.performance import altitude_impairment_multiplicative, recency_weight, weighted_percentile
 from utils.persistence import load_streams
 import config
@@ -25,6 +25,7 @@ def build_pace_curves_from_races(
         recency_mode: str = "mild",
         excluded_ids: set | None = None,
         include_hard_training: bool = False,
+        hr_threshold: int = 150,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
     """
     Build personalized pace curves from Strava race history.
@@ -59,7 +60,8 @@ def build_pace_curves_from_races(
 
     # Filter to only race activities (or hard efforts if opted in)
     races = _filter_and_deduplicate_races(activities, excluded_ids=excluded_ids,
-                                          include_hard_training=include_hard_training)
+                                          include_hard_training=include_hard_training,
+                                          hr_threshold=hr_threshold)
 
     used_race_metadata = []
 
@@ -448,6 +450,7 @@ def _filter_and_deduplicate_races(
         activities: List[Dict],
         excluded_ids: set | None = None,
         include_hard_training: bool = False,
+        hr_threshold: int = 150,
 ) -> List[Dict]:
     """Filter to qualifying activities, remove duplicates, and drop user-excluded races."""
     cutoff = datetime.now(timezone.utc) - timedelta(days=91)
@@ -460,7 +463,7 @@ def _filter_and_deduplicate_races(
             return False
 
     if include_hard_training:
-        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a)) and _within_3_months(a)]
+        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a, hr_threshold)) and _within_3_months(a)]
     else:
         races = [a for a in activities if is_run(a) and is_race(a) and _within_3_months(a)]
 
