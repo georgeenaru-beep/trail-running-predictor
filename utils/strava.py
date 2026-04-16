@@ -121,7 +121,7 @@ def is_hard_effort(a: Dict[str, Any], hr_threshold: int = 150) -> bool:
         return True
     if (a.get("average_heartrate") or 0) > hr_threshold:
         return True
-    if (a.get("suffer_score") or 0) > 50:
+    if (a.get("suffer_score") or 0) > 130:
         return True
     return False
 
