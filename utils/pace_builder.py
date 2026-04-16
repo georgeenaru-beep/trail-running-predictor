@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Tuple
 #local imports
-from utils.strava import get_activity_streams, is_run, is_race
+from utils.strava import get_activity_streams, is_run, is_race, is_hard_effort
 from utils.performance import altitude_impairment_multiplicative, recency_weight, weighted_percentile
 from utils.persistence import load_streams
 import config
@@ -23,6 +23,7 @@ def build_pace_curves_from_races(
         max_activities: int = config.MAX_ACTIVITIES,
         recency_mode: str = "mild",
         excluded_ids: set | None = None,
+        include_hard_training: bool = False,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, Dict[str, Any]]:
     """
     Build personalized pace curves from Strava race history.
@@ -55,8 +56,9 @@ def build_pace_curves_from_races(
     speed_samples_by_bin = [[] for _ in range(n_bins)]
     weight_samples_by_bin = [[] for _ in range(n_bins)]
 
-    # Filter to only race activities
-    races = _filter_and_deduplicate_races(activities, excluded_ids=excluded_ids)
+    # Filter to only race activities (or hard efforts if opted in)
+    races = _filter_and_deduplicate_races(activities, excluded_ids=excluded_ids,
+                                          include_hard_training=include_hard_training)
 
     used_race_metadata = []
 
@@ -441,9 +443,16 @@ def _calibrate_variance_scale(
     return variance_scale, len(z_scores)
 
 
-def _filter_and_deduplicate_races(activities: List[Dict], excluded_ids: set | None = None) -> List[Dict]:
-    """Filter to only races, remove duplicates, and drop user-excluded races."""
-    races = [a for a in activities if is_run(a) and is_race(a)]
+def _filter_and_deduplicate_races(
+        activities: List[Dict],
+        excluded_ids: set | None = None,
+        include_hard_training: bool = False,
+) -> List[Dict]:
+    """Filter to qualifying activities, remove duplicates, and drop user-excluded races."""
+    if include_hard_training:
+        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a))]
+    else:
+        races = [a for a in activities if is_run(a) and is_race(a)]
 
     # Deduplicate by activity ID
     seen = set()

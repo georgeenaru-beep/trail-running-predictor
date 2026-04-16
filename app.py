@@ -217,6 +217,11 @@ with st.sidebar:
 
     st.header("2. Build Pace Model")
     recency_mode = st.select_slider("Recency Weighting", ["off", "mild", "medium"], value="mild")
+    include_hard_training = st.checkbox(
+        "Include hard training runs",
+        value=False,
+        help="Also include long runs (type 2), workouts (type 3), and any run with avg HR > 150 or suffer score > 50.",
+    )
     if st.button("Build from my Strava races", disabled=not tokens):
         with st.spinner("Fetching races and building model..."):
             acts = list_activities(tokens["access_token"])
@@ -224,6 +229,7 @@ with st.sidebar:
                 tokens["access_token"], acts, config.GRADE_BINS,
                 max_activities=config.MAX_ACTIVITIES, recency_mode=recency_mode,
                 excluded_ids=st.session_state.excluded_race_ids,
+                include_hard_training=include_hard_training,
             )
             st.session_state.pace_model = PaceModel(pace_df, used_df, meta)
             save_pace_model_to_disk(st.session_state.pace_model)

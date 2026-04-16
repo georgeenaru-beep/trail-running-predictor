@@ -109,6 +109,17 @@ def is_race(a: Dict[str, Any]) -> bool:
     # Run Type 'Race' appears as workout_type == 1
     return a.get("workout_type") == 1
 
+
+def is_hard_effort(a: Dict[str, Any]) -> bool:
+    """True if activity is a long run (2), workout (3), has avg HR > 150, or suffer score > 50."""
+    if a.get("workout_type") in (2, 3):
+        return True
+    if (a.get("average_heartrate") or 0) > 150:
+        return True
+    if (a.get("suffer_score") or 0) > 50:
+        return True
+    return False
+
 def get_activity_streams(access_token: str, activity_id: int, types=None) -> Dict[str, Any]:
     if types is None:
         types = ["time","distance","altitude","velocity_smooth","grade_smooth","moving","latlng"]
