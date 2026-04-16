@@ -108,12 +108,12 @@ def validate_single_race(race_row, pace_model: PaceModel) -> dict | None:
         return None
 
     actual = float(race_row["elapsed_time_s"])
-    p10 = float(prediction["p10"][-1])
+    p25 = float(prediction["p25"][-1])
     p50 = float(prediction["p50"][-1])
-    p90 = float(prediction["p90"][-1])
+    p75 = float(prediction["p75"][-1])
 
     error_pct = (p50 - actual) / actual * 100.0
-    within = p10 <= actual <= p90
+    within = p25 <= actual <= p75
 
     return {
         "race_id": race_id,
@@ -121,9 +121,9 @@ def validate_single_race(race_row, pace_model: PaceModel) -> dict | None:
         "date": race_row.get("date", ""),
         "distance_km": float(race_row["distance_km"]),
         "actual_s": actual,
-        "p10_s": p10,
+        "p25_s": p25,
         "p50_s": p50,
-        "p90_s": p90,
+        "p75_s": p75,
         "error_pct": error_pct,
         "within_ci": within,
         "gain_m": course.gain_m,
@@ -220,7 +220,7 @@ def print_results_table(results: list[dict]):
             f"{format_hhmmss(r['actual_s']):>8s} "
             f"{format_hhmmss(r['p50_s']):>8s} "
             f"{r['error_pct']:+5.1f}% "
-            f"{format_hhmmss(r['p10_s']):>7s}-{format_hhmmss(r['p90_s']):<7s} "
+            f"{format_hhmmss(r['p25_s']):>7s}-{format_hhmmss(r['p75_s']):<7s} "
             f"{ci_flag:>4s}"
         )
 
@@ -248,16 +248,16 @@ def save_csv(results: list[dict], output_dir: str):
 
     df = pd.DataFrame(results)
     df["actual_hhmmss"] = df["actual_s"].apply(format_hhmmss)
-    df["p10_hhmmss"] = df["p10_s"].apply(format_hhmmss)
+    df["p10_hhmmss"] = df["p25_s"].apply(format_hhmmss)
     df["p50_hhmmss"] = df["p50_s"].apply(format_hhmmss)
-    df["p90_hhmmss"] = df["p90_s"].apply(format_hhmmss)
+    df["p90_hhmmss"] = df["p75_s"].apply(format_hhmmss)
 
     cols = [
         "race_id", "name", "date", "distance_km", "gain_m", "median_alt",
         "actual_s", "actual_hhmmss",
-        "p10_s", "p10_hhmmss",
+        "p25_s", "p10_hhmmss",
         "p50_s", "p50_hhmmss",
-        "p90_s", "p90_hhmmss",
+        "p75_s", "p90_hhmmss",
         "error_pct", "within_ci",
     ]
     df[cols].to_csv(out_path, index=False)

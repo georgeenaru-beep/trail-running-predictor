@@ -157,8 +157,8 @@ def run_predictions_ui(course: Course, conditions: int):
             "Arrival (P50)": [format_seconds(x) for x in arrivals],
             "Departure (P50)": [format_seconds(x) for x in departures],
             "Rest": [fmt_rest(x) for x in rests],
-            "Optimistic (P10)": [format_seconds(x) for x in results["p10"]],
-            "Pessimistic (P90)": [format_seconds(x) for x in results["p90"]],
+            "Optimistic (P25)": [format_seconds(x) for x in results["p25"]],
+            "Pessimistic (P75)": [format_seconds(x) for x in results["p75"]],
         })
 
         # Add helpful explanation
@@ -167,8 +167,8 @@ def run_predictions_ui(course: Course, conditions: int):
             "- **Arrival**: When you reach the checkpoint (running + prior rest)\n"
             "- **Departure**: When you leave (arrival + rest at this stop)\n"
             "- **Rest**: Predicted time spent at this checkpoint\n"
-            "- **Optimistic (P10)**: 10% chance of being this fast\n"
-            "- **Pessimistic (P90)**: 90% chance of being faster than this"
+            "- **Optimistic (P25)**: 25% chance of being this fast\n"
+            "- **Pessimistic (P75)**: 75% chance of being faster than this"
         )
 
 

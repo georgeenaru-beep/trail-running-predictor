@@ -533,9 +533,9 @@ def _simulate_with_conditions(baseline_times, raw_base_times, running_only_times
 
     samples = np.cumsum(varied_running + varied_rest, axis=1)  # (sims, n_legs)
 
-    return (np.percentile(samples, 10, axis=0),
+    return (np.percentile(samples, 25, axis=0),
             np.percentile(samples, 50, axis=0),
-            np.percentile(samples, 90, axis=0))
+            np.percentile(samples, 75, axis=0))
 
 
 def run_prediction_simulation(course, pace_model, conditions=0):
@@ -585,7 +585,7 @@ def run_prediction_simulation(course, pace_model, conditions=0):
     log.debug(f"Running {config.MC_SIMS} simulations...")
 
     # Step 5: Monte Carlo simulation WITH conditions
-    p10, p50, p90 = _simulate_with_conditions(
+    p25, p50, p75 = _simulate_with_conditions(
         adjusted_times,  # ultra-adjusted baseline (fatigue + rest)
         base_times,  # raw speed baseline (pre-scaling)
         running_only_times,  # fatigue only, no rest
@@ -602,9 +602,9 @@ def run_prediction_simulation(course, pace_model, conditions=0):
         dist_km = course.leg_ends_x[i] * course.total_km
         if i < 3 or (9 <= dist_km <= 11) or i == len(course.leg_ends_x) - 1:
             log.debug(f"Checkpoint {i}: {dist_km:.1f}km")
-            log.debug(f"  P10: {format_time(p10[i])}")
+            log.debug(f"  P25: {format_time(p25[i])}")
             log.debug(f"  P50: {format_time(p50[i])}")
-            log.debug(f"  P90: {format_time(p90[i])}")
+            log.debug(f"  P75: {format_time(p75[i])}")
 
     log.debug("\nTransformation summary:")
     log.debug(f"  Base finish: {format_time(base_times[-1])}")
@@ -631,9 +631,9 @@ def run_prediction_simulation(course, pace_model, conditions=0):
     }
 
     return {
-        "p10": p10,
+        "p25": p25,
         "p50": adjusted_times,
-        "p90": p90,
+        "p75": p75,
         "running_only_p50": running_only_times,
         "metadata": metadata
     }

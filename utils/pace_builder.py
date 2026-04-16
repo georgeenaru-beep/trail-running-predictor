@@ -416,15 +416,15 @@ def _calibrate_variance_scale(
             continue
 
         actual = float(row["elapsed_time_s"])
-        p10 = float(pred["p10"][-1])
+        p25 = float(pred["p25"][-1])
         p50 = float(pred["p50"][-1])
-        p90 = float(pred["p90"][-1])
+        p75 = float(pred["p75"][-1])
 
-        band_width = p90 - p10
+        band_width = p75 - p25
         if band_width < config.EPSILON:
             continue
 
-        z = (actual - p50) / (band_width / 2.56)
+        z = (actual - p50) / (band_width / 1.349)  # P25/P75 band spans 2 × 0.674σ
         z_scores.append(abs(z))
 
     if len(z_scores) < 3:
@@ -453,19 +453,21 @@ def _filter_and_deduplicate_races(
         hr_threshold: int = 150,
 ) -> List[Dict]:
     """Filter to qualifying activities, remove duplicates, and drop user-excluded races."""
-    cutoff = datetime.now(timezone.utc) - timedelta(days=91)
+    cutoff_race = datetime.now(timezone.utc) - timedelta(days=365)  # races: 12-month window
+    cutoff_training = datetime.now(timezone.utc) - timedelta(days=91)  # other: 3-month window
 
-    def _within_3_months(a):
+    def _within_window(a):
         raw = a.get("start_date", "")
         try:
-            return datetime.fromisoformat(raw.replace("Z", "+00:00")) >= cutoff
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            return dt >= (cutoff_race if is_race(a) else cutoff_training)
         except (ValueError, AttributeError):
             return False
 
     if include_hard_training:
-        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a, hr_threshold)) and _within_3_months(a)]
+        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a, hr_threshold)) and _within_window(a)]
     else:
-        races = [a for a in activities if is_run(a) and is_race(a) and _within_3_months(a)]
+        races = [a for a in activities if is_run(a) and is_race(a) and _within_window(a)]
 
     # Deduplicate by activity ID
     seen = set()
@@ -516,12 +518,14 @@ def _process_single_race(
     # Calculate recency weight
     race_weight = recency_weight(activity.get("start_date", ""), recency_mode)
 
-    # Process each GPS point
+    # Process each GPS point; races count 3x heavier than training runs
+    activity_mult = 3.0 if is_race(activity) else 1.0
     used_any = _process_gps_points(
         dist_m, vel, grd_arr, mov,
         altitude_factor, race_weight,
         bins, n_bins,
-        speed_samples_by_bin, weight_samples_by_bin
+        speed_samples_by_bin, weight_samples_by_bin,
+        activity_mult=activity_mult,
     )
 
     if not used_any:
@@ -612,7 +616,8 @@ def _process_gps_points(
         dist_m, vel, grd_arr, mov,
         altitude_factor, race_weight,
         bins, n_bins,
-        speed_samples_by_bin, weight_samples_by_bin
+        speed_samples_by_bin, weight_samples_by_bin,
+        activity_mult: float = 1.0,
 ) -> bool:
     """
     Process GPS points and bin speeds by grade.
@@ -645,9 +650,9 @@ def _process_gps_points(
                     config.SEA_LEVEL_CLIP_HIGH)
         )
 
-        # Add to appropriate bin with weight
+        # Add to appropriate bin with weight (races are 3x heavier)
         speed_samples_by_bin[bin_index].append(sea_level_speed)
-        weight_samples_by_bin[bin_index].append(float(dd[i] * race_weight))
+        weight_samples_by_bin[bin_index].append(float(dd[i] * race_weight * activity_mult))
         used_any = True
 
     return used_any
