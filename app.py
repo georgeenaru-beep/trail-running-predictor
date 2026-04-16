@@ -222,11 +222,19 @@ with st.sidebar:
         value=False,
         help="Also include long runs (type 2), workouts (type 3), and any run with avg HR > 150 or suffer score > 50.",
     )
+    if "hr_threshold" in st.session_state:
+        st.caption(
+            f"Hard effort threshold: {st.session_state.hr_threshold} bpm "
+            f"(based on {st.session_state.hr_threshold_n_runs} runs from last 3 months)"
+        )
+
     if st.button("Build from my Strava races", disabled=not tokens):
         with st.spinner("Fetching races and building model..."):
             acts = list_activities(tokens["access_token"])
             if "hr_threshold" not in st.session_state:
-                st.session_state.hr_threshold = compute_hr_threshold(acts)
+                thr, n_hr_runs = compute_hr_threshold(acts)
+                st.session_state.hr_threshold = thr
+                st.session_state.hr_threshold_n_runs = n_hr_runs
             pace_df, used_df, meta = build_pace_curves_from_races(
                 tokens["access_token"], acts, config.GRADE_BINS,
                 max_activities=config.MAX_ACTIVITIES, recency_mode=recency_mode,

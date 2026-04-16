@@ -131,11 +131,11 @@ def compute_hr_threshold(
         fallback: int = 150,
         min_activities: int = 10,
         percentile: float = 70.0,
-) -> int:
-    """Return the personalised HR threshold for hard-effort detection.
+) -> tuple[int, int]:
+    """Return (threshold_bpm, n_runs) for hard-effort HR detection.
 
     Computes the given percentile of average_heartrate across all runs
-    from the last 3 months. Falls back to `fallback` when fewer than
+    from the last 3 months. Returns (fallback, n_runs) when fewer than
     `min_activities` runs have HR data.
     """
     cutoff = datetime.now(timezone.utc) - timedelta(days=91)
@@ -153,19 +153,21 @@ def compute_hr_threshold(
         if hr and hr > 0:
             hr_values.append(float(hr))
 
-    if len(hr_values) < min_activities:
+    n_runs = len(hr_values)
+
+    if n_runs < min_activities:
         log.info(
             "HR threshold: only %d run(s) with HR data in last 3 months (need %d) — using fallback %d bpm",
-            len(hr_values), min_activities, fallback,
+            n_runs, min_activities, fallback,
         )
-        return fallback
+        return fallback, n_runs
 
     threshold = int(np.percentile(hr_values, percentile))
     log.info(
         "HR threshold: %.0fth percentile of %d runs = %d bpm",
-        percentile, len(hr_values), threshold,
+        percentile, n_runs, threshold,
     )
-    return threshold
+    return threshold, n_runs
 
 def get_activity_streams(access_token: str, activity_id: int, types=None) -> Dict[str, Any]:
     if types is None:

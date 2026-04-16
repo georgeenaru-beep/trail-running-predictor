@@ -372,7 +372,7 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
 
     if "average_heartrate" in display_df.columns:
         display_df["avg HR"] = display_df["average_heartrate"].apply(
-            lambda v: f"{int(v)}" if pd.notna(v) else ""
+            lambda v: f"{int(v)}" if pd.notna(v) else "-"
         )
 
     if "suffer_score" in display_df.columns:
