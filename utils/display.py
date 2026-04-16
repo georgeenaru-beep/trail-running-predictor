@@ -91,24 +91,26 @@ def display_course_details(course):
         center_lat = (lat_min + lat_max) / 2
         center_lon = (lon_min + lon_max) / 2
 
-        # Estimate zoom level based on bounds
+        # Compute zoom from the larger of lat/lon span, with one level of padding
         lat_diff = lat_max - lat_min
         lon_diff = lon_max - lon_min
         max_diff = max(lat_diff, lon_diff)
 
-        # Rough zoom calculation
-        if max_diff > 1:
+        if max_diff > 2:
             zoom_start = 8
-        elif max_diff > 0.5:
+        elif max_diff > 1:
             zoom_start = 9
-        elif max_diff > 0.1:
+        elif max_diff > 0.5:
+            zoom_start = 10
+        elif max_diff > 0.2:
             zoom_start = 11
-        elif max_diff > 0.05:
+        elif max_diff > 0.1:
             zoom_start = 12
-        else:
+        elif max_diff > 0.05:
             zoom_start = 13
+        else:
+            zoom_start = 14
 
-        # Initialize map with center and zoom
         m = folium.Map(
             location=[center_lat, center_lon],
             zoom_start=zoom_start,
@@ -118,9 +120,6 @@ def display_course_details(course):
         # Add the route
         route = list(zip(course.df_raw['lat'], course.df_raw['lon']))
         folium.PolyLine(route, weight=4, opacity=0.8, color='blue').add_to(m)
-
-        # Fit bounds after adding the route
-        m.fit_bounds([[lat_min, lon_min], [lat_max, lon_max]])
 
         # Add aid station markers
         clusters = aid_station_markers(course.df_raw, course.aid_km)
