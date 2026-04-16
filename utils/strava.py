@@ -116,9 +116,8 @@ def is_race(a: Dict[str, Any]) -> bool:
 
 
 def is_hard_effort(a: Dict[str, Any], hr_threshold: int = 150) -> bool:
-    """True if activity is a long run (2), workout (3), has avg HR above threshold, or suffer score > 50."""
-    if a.get("workout_type") in (2, 3):
-        return True
+    """True if avg HR is above threshold or suffer score > 130 (Strava Premium).
+    workout_type 2/3 alone is not sufficient without HR or suffer score verification."""
     if (a.get("average_heartrate") or 0) > hr_threshold:
         return True
     if (a.get("suffer_score") or 0) > 130:
