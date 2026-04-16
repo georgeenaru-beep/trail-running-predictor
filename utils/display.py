@@ -354,7 +354,17 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
     # Add Exclude column based on current exclusions
     display_df["Exclude"] = display_df["id"].astype(str).isin(excluded_ids)
 
-    cols = ['name', 'date', 'distance_km', 'Exclude']
+    if "elapsed_time_s" in display_df.columns:
+        def _fmt_elapsed(s):
+            s = int(s)
+            h, rem = divmod(s, 3600)
+            m, sec = divmod(rem, 60)
+            return f"{h}:{m:02d}:{sec:02d}"
+        display_df["time"] = display_df["elapsed_time_s"].apply(
+            lambda s: _fmt_elapsed(s) if pd.notna(s) and s > 0 else ""
+        )
+
+    cols = ['name', 'date', 'distance_km', 'time', 'Exclude']
     cols = [c for c in cols if c in display_df.columns]
 
     if not cols:
