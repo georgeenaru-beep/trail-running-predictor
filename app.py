@@ -244,7 +244,7 @@ with st.sidebar:
             )
             st.session_state.pace_model = PaceModel(pace_df, used_df, meta)
             save_pace_model_to_disk(st.session_state.pace_model)
-            st.success("Pace model built!")
+            st.rerun()
 
     st.header("3. Course Details")
     gpx_file = st.file_uploader("Upload race GPX", type=["gpx"])
