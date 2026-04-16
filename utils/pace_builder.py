@@ -541,6 +541,9 @@ def _process_single_race(
         "elapsed_time_s": elapsed_time_s,
         "median_alt_m": median_alt,
         "weight": round(race_weight, 3),
+        "workout_type": activity.get("workout_type"),
+        "average_heartrate": activity.get("average_heartrate"),
+        "suffer_score": activity.get("suffer_score"),
         "_rest_data": rest_data,
         "_fatigue_data": fatigue_data,
     }

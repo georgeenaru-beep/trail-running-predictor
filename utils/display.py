@@ -364,7 +364,23 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
             lambda s: _fmt_elapsed(s) if pd.notna(s) and s > 0 else ""
         )
 
-    cols = ['name', 'date', 'distance_km', 'time', 'Exclude']
+    _workout_labels = {0: "Easy", 1: "Race", 2: "Long run", 3: "Workout"}
+    if "workout_type" in display_df.columns:
+        display_df["type"] = display_df["workout_type"].apply(
+            lambda w: _workout_labels.get(int(w), str(w)) if pd.notna(w) else ""
+        )
+
+    if "average_heartrate" in display_df.columns:
+        display_df["avg HR"] = display_df["average_heartrate"].apply(
+            lambda v: f"{int(v)}" if pd.notna(v) else ""
+        )
+
+    if "suffer_score" in display_df.columns:
+        display_df["rel effort"] = display_df["suffer_score"].apply(
+            lambda v: f"{int(v)}" if pd.notna(v) else ""
+        )
+
+    cols = ['name', 'date', 'distance_km', 'time', 'type', 'avg HR', 'rel effort', 'Exclude']
     cols = [c for c in cols if c in display_df.columns]
 
     if not cols:
