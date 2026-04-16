@@ -6,6 +6,7 @@ Integrates with Strava to analyze past performances.
 import logging
 import numpy as np
 import pandas as pd
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Tuple
 #local imports
 from utils.strava import get_activity_streams, is_run, is_race, is_hard_effort
@@ -449,10 +450,19 @@ def _filter_and_deduplicate_races(
         include_hard_training: bool = False,
 ) -> List[Dict]:
     """Filter to qualifying activities, remove duplicates, and drop user-excluded races."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=91)
+
+    def _within_3_months(a):
+        raw = a.get("start_date", "")
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")) >= cutoff
+        except (ValueError, AttributeError):
+            return False
+
     if include_hard_training:
-        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a))]
+        races = [a for a in activities if is_run(a) and (is_race(a) or is_hard_effort(a)) and _within_3_months(a)]
     else:
-        races = [a for a in activities if is_run(a) and is_race(a)]
+        races = [a for a in activities if is_run(a) and is_race(a) and _within_3_months(a)]
 
     # Deduplicate by activity ID
     seen = set()
