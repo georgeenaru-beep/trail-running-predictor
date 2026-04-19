@@ -4,6 +4,7 @@ import time
 import json
 import numpy as np
 import requests
+import streamlit as st
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 from urllib.parse import urlencode
@@ -13,15 +14,14 @@ log = logging.getLogger(__name__)
 
 os.makedirs(config.CACHE_DIR, exist_ok=True)
 
+_SESSION_KEY = "strava_tokens"
+
 def _save_tokens(tokens: Dict[str, Any]):
-    with open(config.TOKENS_PATH, "w") as f:
-        json.dump(tokens, f)
+    """Store tokens in session state only — never shared across users."""
+    st.session_state[_SESSION_KEY] = tokens
 
 def _load_tokens() -> Dict[str, Any] | None:
-    if not os.path.exists(config.TOKENS_PATH):
-        return None
-    with open(config.TOKENS_PATH, "r") as f:
-        return json.load(f)
+    return st.session_state.get(_SESSION_KEY)
 
 def build_auth_url(client_id: str, redirect_uri: str, scope: str="read,activity:read_all", approval_prompt: str="auto") -> str:
     params = {
@@ -40,6 +40,10 @@ def exchange_code_for_token(client_id: str, client_secret: str, code: str) -> Di
     tokens = r.json()
     tokens["obtained_at"] = int(time.time())
     tokens["client_id_used"] = str(client_id)
+    # Persist athlete_id so it survives token refreshes
+    athlete = tokens.get("athlete") or {}
+    if athlete.get("id"):
+        tokens["athlete_id"] = str(athlete["id"])
     _save_tokens(tokens)
     return tokens
 
@@ -48,13 +52,21 @@ def _refresh_access_token(client_id: str, client_secret: str, refresh_token: str
     r = requests.post(config.STRAVA_TOKEN_URL, data=payload, timeout=config.DEFAULT_TIMEOUT); r.raise_for_status()
     if r.status_code >= 400:
         raise requests.HTTPError(f"{r.status_code} {r.text}", response=r)
-    tokens = r.json(); tokens["obtained_at"] = int(time.time()); _save_tokens(tokens);
+    tokens = r.json()
+    tokens["obtained_at"] = int(time.time())
+    # Refresh responses don't include athlete — carry it forward from session
+    old = _load_tokens() or {}
+    if "athlete_id" in old:
+        tokens["athlete_id"] = old["athlete_id"]
+    _save_tokens(tokens)
     return tokens
 
 def _get_headers(access_token: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
 
 def _disconnect_strava():
+    st.session_state.pop(_SESSION_KEY, None)
+    # Clean up any legacy shared token file
     try:
         os.remove(config.TOKENS_PATH)
     except FileNotFoundError:

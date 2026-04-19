@@ -178,13 +178,15 @@ st.title("🏃‍♂️ Race Time Predictor")
 
 # Initialize session state
 if 'pace_model' not in st.session_state:
-    st.session_state.pace_model = load_pace_model_from_disk()
+    st.session_state.pace_model = None  # Loaded after auth, per athlete
 if 'course' not in st.session_state:
     st.session_state.course = None
 if 'eta_results' not in st.session_state:
     st.session_state.eta_results = None
 if 'excluded_race_ids' not in st.session_state:
-    st.session_state.excluded_race_ids = load_excluded_race_ids()
+    st.session_state.excluded_race_ids = set()  # Loaded after auth, per athlete
+if 'athlete_id' not in st.session_state:
+    st.session_state.athlete_id = None
 
 # Handle OAuth callback
 handle_oauth_callback()
@@ -202,6 +204,12 @@ with st.sidebar:
     tokens = ensure_token(client_id, client_secret)
 
     if tokens:
+        athlete_id = tokens.get("athlete_id")
+        # Load this athlete's data the first time we recognise them in this session
+        if athlete_id and st.session_state.athlete_id != athlete_id:
+            st.session_state.athlete_id = athlete_id
+            st.session_state.pace_model = load_pace_model_from_disk(athlete_id)
+            st.session_state.excluded_race_ids = load_excluded_race_ids(athlete_id)
         st.success("Connected ✅")
     elif client_id and client_secret:
         st.link_button("Connect Strava", url=build_auth_url(client_id, get_redirect_uri()))
@@ -243,7 +251,7 @@ with st.sidebar:
                 hr_threshold=st.session_state.hr_threshold,
             )
             st.session_state.pace_model = PaceModel(pace_df, used_df, meta)
-            save_pace_model_to_disk(st.session_state.pace_model)
+            save_pace_model_to_disk(st.session_state.pace_model, athlete_id=st.session_state.athlete_id)
             st.rerun()
 
     st.header("3. Course Details")

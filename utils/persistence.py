@@ -12,42 +12,52 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def save_pace_model_to_disk(pace_model):
+def _athlete_dir(athlete_id) -> str:
+    """Return the data directory for a specific athlete."""
+    if athlete_id:
+        return os.path.join(config.DATA_DIR, f"athlete_{athlete_id}")
+    return config.DATA_DIR
+
+
+def save_pace_model_to_disk(pace_model, athlete_id=None):
     """
-    Persist pace model to CSV/JSON files.
+    Persist pace model to CSV/JSON files, scoped to the given athlete.
 
     Args:
         pace_model: PaceModel object to save
+        athlete_id: Strava athlete ID string (None falls back to shared dir)
     """
     try:
-        Path(config.DATA_DIR).mkdir(exist_ok=True)
-        pace_model.pace_df.to_csv(config.PACE_CURVES_PATH, index=False)
-        pace_model.used_races.to_csv(config.USED_RACES_PATH, index=False)
-        with open(config.MODEL_META_PATH, "w") as f:
+        d = _athlete_dir(athlete_id)
+        Path(d).mkdir(parents=True, exist_ok=True)
+        pace_model.pace_df.to_csv(os.path.join(d, "pace_curves.csv"), index=False)
+        pace_model.used_races.to_csv(os.path.join(d, "used_races.csv"), index=False)
+        with open(os.path.join(d, "model_meta.json"), "w") as f:
             json.dump(pace_model.meta, f)
     except Exception as e:
         st.warning(f"Could not save model to disk: {e}")
 
 
-def load_pace_model_from_disk():
+def load_pace_model_from_disk(athlete_id=None):
     """
-    Load pace model from disk if available.
+    Load pace model from disk if available, scoped to the given athlete.
 
     Returns:
         PaceModel object if successfully loaded, None otherwise
     """
-    if not all([
-        os.path.exists(config.PACE_CURVES_PATH),
-        os.path.exists(config.USED_RACES_PATH),
-        os.path.exists(config.MODEL_META_PATH)
-    ]):
+    d = _athlete_dir(athlete_id)
+    curves = os.path.join(d, "pace_curves.csv")
+    races = os.path.join(d, "used_races.csv")
+    meta_path = os.path.join(d, "model_meta.json")
+
+    if not all([os.path.exists(curves), os.path.exists(races), os.path.exists(meta_path)]):
         return None
 
     try:
         from models import PaceModel
-        pace_df = pd.read_csv(config.PACE_CURVES_PATH)
-        used_races = pd.read_csv(config.USED_RACES_PATH)
-        with open(config.MODEL_META_PATH, "r") as f:
+        pace_df = pd.read_csv(curves)
+        used_races = pd.read_csv(races)
+        with open(meta_path, "r") as f:
             meta = json.load(f)
         return PaceModel(pace_df, used_races, meta)
     except Exception as e:
@@ -96,9 +106,10 @@ def forget_app_creds(app_credits_path: str):
         pass
 
 
-def load_excluded_race_ids() -> set:
-    """Load set of race IDs the user has chosen to exclude."""
-    path = config.EXCLUDED_RACES_PATH
+def load_excluded_race_ids(athlete_id=None) -> set:
+    """Load set of race IDs the user has chosen to exclude, scoped to athlete."""
+    d = _athlete_dir(athlete_id)
+    path = os.path.join(d, "excluded_races.csv")
     if not os.path.exists(path):
         return set()
     try:
@@ -108,11 +119,12 @@ def load_excluded_race_ids() -> set:
         return set()
 
 
-def save_excluded_race_ids(excluded_ids: set):
-    """Persist the set of excluded race IDs to CSV."""
-    Path(config.DATA_DIR).mkdir(exist_ok=True)
+def save_excluded_race_ids(excluded_ids: set, athlete_id=None):
+    """Persist the set of excluded race IDs to CSV, scoped to athlete."""
+    d = _athlete_dir(athlete_id)
+    Path(d).mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame({"id": sorted(excluded_ids)})
-    df.to_csv(config.EXCLUDED_RACES_PATH, index=False)
+    df.to_csv(os.path.join(d, "excluded_races.csv"), index=False)
 
 
 def load_streams(race_id) -> dict | None:

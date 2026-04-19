@@ -399,7 +399,7 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
         for i, row in edited.iterrows():
             if row.get("Exclude", False):
                 new_excluded.add(str(sorted_df.iloc[i]["id"]))
-        save_excluded_race_ids(new_excluded)
+        save_excluded_race_ids(new_excluded, athlete_id=st.session_state.get("athlete_id"))
         st.session_state["excluded_race_ids"] = new_excluded
         st.success(f"Saved {len(new_excluded)} exclusion(s). Rebuild your model to apply.")
         st.rerun()
