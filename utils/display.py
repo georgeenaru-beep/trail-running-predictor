@@ -135,9 +135,86 @@ def display_course_details(course):
         st_folium(m, width=None, height=400, returned_objects=[])
 
 
+def _create_race_elevation_profile(course):
+    """
+    Full-race elevation profile with a layered ribbon effect and aid station markers.
+    Multiple offset copies of the terrain line are drawn to create depth.
+    """
+    df = course.df_res
+    x_km = df['dist_m'].values / 1000.0
+    y_m = df['ele_m'].values
+
+    y_min = y_m.min()
+    y_max = y_m.max()
+    y_range = y_max - y_min
+    floor = y_min - y_range * 0.12
+
+    n_layers = 20
+    layer_step = max(3.0, y_range * 0.022)  # ~2% of range per layer
+
+    fig, ax = plt.subplots(figsize=(12, 4))
+    fig.patch.set_facecolor('#F8F9FA')
+    ax.set_facecolor('#F8F9FA')
+
+    # Draw layers bottom-to-top so upper ones paint over lower ones
+    for i in range(n_layers, 0, -1):
+        y_layer = y_m - i * layer_step
+        frac = 1.0 - i / n_layers          # 0 at bottom layer, 1 at top
+        alpha = 0.12 + 0.55 * frac
+        lw    = 0.4  + 0.8  * frac
+        green = (0.10 + 0.25 * frac, 0.55 + 0.25 * frac, 0.15 + 0.15 * frac)
+        ax.plot(x_km, y_layer, color=green, alpha=alpha, linewidth=lw, zorder=i)
+        # Fill each layer to the floor to create a solid ribbon
+        ax.fill_between(x_km, y_layer, floor,
+                        color=(0.18, 0.72, 0.30), alpha=0.018, zorder=i)
+
+    # Top contour — most prominent line
+    ax.plot(x_km, y_m, color='#1A7A30', linewidth=2.0, zorder=n_layers + 1)
+    ax.fill_between(x_km, y_m, floor, color='#2ECC71', alpha=0.08, zorder=0)
+
+    # Aid station vertical markers
+    for idx, km in enumerate(course.aid_km):
+        ax.axvline(x=km, color='#555', linewidth=0.8, linestyle='--',
+                   alpha=0.5, zorder=n_layers + 2)
+        ax.text(km, y_max + y_range * 0.06,
+                f"AS{idx + 1}\n{km:.1f} km",
+                ha='center', va='bottom', fontsize=7.5,
+                color='#333', fontweight='bold', zorder=n_layers + 3)
+
+    # Finish marker
+    ax.axvline(x=x_km[-1], color='#C0392B', linewidth=1.0,
+               linestyle='--', alpha=0.6, zorder=n_layers + 2)
+    ax.text(x_km[-1], y_max + y_range * 0.06,
+            f"Finish\n{course.total_km:.1f} km",
+            ha='center', va='bottom', fontsize=7.5,
+            color='#C0392B', fontweight='bold', zorder=n_layers + 3)
+
+    # Elevation tick labels on y-axis
+    ax.set_ylabel('Elevation (m)', fontsize=9, color='#555')
+    ax.set_xlabel('Distance (km)', fontsize=9, color='#555')
+    ax.tick_params(colors='#666', labelsize=8)
+
+    ax.set_xlim(x_km[0], x_km[-1])
+    ax.set_ylim(floor, y_max + y_range * 0.25)
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_alpha(0.3)
+    ax.spines['bottom'].set_alpha(0.3)
+    ax.grid(axis='y', alpha=0.15, linestyle=':', color='#999')
+
+    plt.tight_layout()
+    return fig
+
+
 def display_segments_overview(course):
     """Displays segment breakdown with elevation profiles and download option."""
     try:
+        # Overall race profile at the top
+        fig_overall = _create_race_elevation_profile(course)
+        st.pyplot(fig_overall)
+        plt.close(fig_overall)
+        st.divider()
         names_list = [f"AS{i + 1}" for i in range(len(course.legs_idx) - 1)] + ["Finish"]
         seg_rows = []
 
