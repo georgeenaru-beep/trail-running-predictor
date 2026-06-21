@@ -538,7 +538,7 @@ def _simulate_with_conditions(baseline_times, raw_base_times, running_only_times
             np.percentile(samples, 75, axis=0))
 
 
-def run_prediction_simulation(course, pace_model, conditions=0):
+def run_prediction_simulation(course, pace_model, conditions=0, checkpoint_time_s=0.0):
     """
     Main prediction entry point with improved ultra handling.
 
@@ -578,6 +578,18 @@ def run_prediction_simulation(course, pace_model, conditions=0):
     adjusted_times, running_only_times, ultra_meta = apply_ultra_adjustments(
         scaled_times, course, pace_model
     )
+
+    # Override rest with manual checkpoint time if the user specified one
+    if checkpoint_time_s > 0:
+        n_aid = len(course.leg_end_km) - 1  # aid stations, excluding finish
+        n_legs = len(running_only_times)
+        adjusted_times = np.array([
+            running_only_times[i] + min(i + 1, n_aid) * checkpoint_time_s
+            for i in range(n_legs)
+        ])
+        ultra_meta["rest_added_finish_s"] = float(n_aid * checkpoint_time_s)
+        ultra_meta["rest_source"] = "manual"
+        log.debug(f"Manual rest: {checkpoint_time_s:.0f}s x {n_aid} aid stations = {n_aid * checkpoint_time_s:.0f}s total")
 
     log.debug("=" * 60)
     log.debug("STAGE 4: MONTE CARLO SIMULATION")

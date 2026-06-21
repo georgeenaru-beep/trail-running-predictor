@@ -85,7 +85,7 @@ def handle_oauth_callback():
             st.error(f"OAuth error: {e}")
 
 
-def run_predictions_ui(course: Course, conditions: int):
+def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int = 0):
     """
     Run predictions and update UI with results.
     Now uses single conditions parameter and clearer labels.
@@ -94,7 +94,7 @@ def run_predictions_ui(course: Course, conditions: int):
         pace_model = st.session_state.pace_model
 
         # Run the simplified prediction logic
-        results = run_prediction_simulation(course, pace_model, conditions)
+        results = run_prediction_simulation(course, pace_model, conditions, checkpoint_time_s=checkpoint_time_min * 60)
 
         # Store metadata
         st.session_state.prediction_meta = results["metadata"]
@@ -103,7 +103,7 @@ def run_predictions_ui(course: Course, conditions: int):
         meta = results["metadata"]
         altitude_slowdown = (meta['alt_speed_factor'] - 1) * 100
         rest_source = meta.get("rest_source", "fallback")
-        rest_label = "learned" if rest_source == "learned" else "default"
+        rest_label = {"learned": "learned", "manual": "manual"}.get(rest_source, "default")
 
         # Show metadata
         st.caption(
@@ -263,7 +263,22 @@ with st.sidebar:
     aid_units = st.radio("Aid station units", ["km", "mi"], horizontal=True)
     st.caption("All outputs are in metric (km). This only affects input parsing.")
 
+    checkpoint_time_min = st.number_input(
+        "Avg. time per aid station (min)",
+        min_value=0,
+        max_value=60,
+        value=0,
+        step=1,
+        help="Time you plan to spend at each aid station. Set to 0 to use your learned rest pattern.",
+    )
+
     course = get_course_from_session(aid_km_text, aid_units)
+
+    n_aid = len(course.leg_end_km) - 1 if course else 0
+    if checkpoint_time_min > 0 and n_aid > 0:
+        st.caption(f"Applies to {n_aid} aid station{'s' if n_aid != 1 else ''} - total: {checkpoint_time_min * n_aid} min")
+    elif checkpoint_time_min == 0:
+        st.caption("Uses your learned rest pattern (or default if fewer than 5 races).")
 
     st.header("4. Race Conditions")
 
@@ -307,7 +322,7 @@ with tab_race:
 
         st.divider()
         st.subheader("Predictions")
-        run_predictions_ui(course, conditions) 
+        run_predictions_ui(course, conditions, checkpoint_time_min)
         display_prediction_results()
 
 # --- Data Tab ---
