@@ -158,7 +158,7 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
             s = int(sec_per_km % 60)
             return f"{m}:{s:02d}"
 
-        # Cumulative elevation gain and cumulative pace/GAP per checkpoint
+        # Per-segment elevation gain and pace/GAP
         leg_gains = []
         for a, b in course.legs_idx:
             seg = course.df_res.iloc[a:b + 1]
@@ -167,21 +167,36 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
 
         avg_paces = []
         gaps = []
-        cumulative_gain = 0.0
+        prev_run = 0.0
+        prev_km = 0.0
         for i in range(n_cp):
-            cumulative_gain += leg_gains[i] if i < len(leg_gains) else 0.0
-            cum_km = course.leg_end_km[i]
-            cum_run_s = running_only[i]
-            gap_km = cum_km + cumulative_gain * 0.01
-            avg_paces.append(fmt_pace(cum_run_s / cum_km) if cum_km > 0 else "-")
-            gaps.append(fmt_pace(cum_run_s / gap_km) if gap_km > 0 else "-")
+            leg_run_s = running_only[i] - prev_run
+            leg_km = course.leg_end_km[i] - prev_km
+            gain_m = leg_gains[i] if i < len(leg_gains) else 0.0
+            gap_km = leg_km + gain_m * 0.01
+            avg_paces.append(fmt_pace(leg_run_s / leg_km) if leg_km > 0 else "-")
+            gaps.append(fmt_pace(leg_run_s / gap_km) if gap_km > 0 else "-")
+            prev_run = running_only[i]
+            prev_km = course.leg_end_km[i]
 
-        # Overall values are just the Finish row
+        # Total row
         total_run_s = running_only[-1]
         total_km = course.total_km
         total_gain_m = sum(leg_gains)
+        total_rest_s = sum(rests)
+        total_row = {
+            "Checkpoint": "Total",
+            "Distance (km)": round(total_km, 1),
+            "Arrival (P50)": "",
+            "Departure (P50)": format_seconds(p50[-1]),
+            "Rest": fmt_rest(total_rest_s),
+            "Avg Pace": fmt_pace(total_run_s / total_km) if total_km > 0 else "-",
+            "GAP": fmt_pace(total_run_s / (total_km + total_gain_m * 0.01)) if total_km > 0 else "-",
+            "Optimistic (P25)": format_seconds(results["p25"][-1]),
+            "Pessimistic (P75)": format_seconds(results["p75"][-1]),
+        }
 
-        st.session_state.eta_results = pd.DataFrame({
+        checkpoint_df = pd.DataFrame({
             "Checkpoint": names,
             "Distance (km)": [round(x, 1) for x in course.leg_end_km],
             "Arrival (P50)": [format_seconds(x) for x in arrivals],
@@ -192,13 +207,17 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
             "Optimistic (P25)": [format_seconds(x) for x in results["p25"]],
             "Pessimistic (P75)": [format_seconds(x) for x in results["p75"]],
         })
+        st.session_state.eta_results = pd.concat(
+            [checkpoint_df, pd.DataFrame([total_row])], ignore_index=True
+        )
+
         # Add helpful explanation
         st.info(
             "**How to read predictions:**\n"
             "- **Arrival**: When you reach the checkpoint (running + prior rest)\n"
             "- **Departure**: When you leave (arrival + rest at this stop)\n"
             "- **Rest**: Predicted time spent at this checkpoint\n"
-            "- **Avg Pace / GAP**: Cumulative average from start to this checkpoint (running time only)\n"
+            "- **Avg Pace / GAP**: Per-segment pace (running time only, excl. stops)\n"
             "- **Optimistic (P25)**: 25% chance of being this fast\n"
             "- **Pessimistic (P75)**: 75% chance of being faster than this"
         )
