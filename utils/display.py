@@ -149,7 +149,7 @@ def _create_race_elevation_profile(course):
     y_range = y_max - y_min
     floor = y_min - y_range * 0.12
 
-    n_layers = 20
+    n_layers = 12
     layer_step = max(3.0, y_range * 0.022)  # ~2% of range per layer
 
     fig, ax = plt.subplots(figsize=(12, 4))
