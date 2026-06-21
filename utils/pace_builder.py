@@ -531,6 +531,14 @@ def _process_single_race(
     if not used_any:
         return None
 
+    # Compute total elevation loss from altitude stream
+    if alt is not None:
+        alt_arr = np.array(alt, dtype=float)
+        diffs = np.diff(alt_arr)
+        computed_loss_m = float(np.sum(np.maximum(-diffs, 0)))
+    else:
+        computed_loss_m = 0.0
+
     # Extract rest data from the same streams
     elapsed_time_s = int(activity.get("elapsed_time") or 0)
     moving_time_s = int(activity.get("moving_time") or elapsed_time_s)
@@ -551,6 +559,7 @@ def _process_single_race(
         "median_alt_m": median_alt,
         "weight": round(race_weight, 3),
         "gain_m": round(activity.get("total_elevation_gain") or 0),
+        "loss_m": round(computed_loss_m),
         "workout_type": activity.get("workout_type"),
         "average_heartrate": activity.get("average_heartrate"),
         "suffer_score": activity.get("suffer_score"),

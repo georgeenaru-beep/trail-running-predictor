@@ -158,12 +158,24 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
             s = int(sec_per_km % 60)
             return f"{m}:{s:02d}"
 
-        # Per-segment elevation gain and pace/GAP
-        leg_gains = []
-        for a, b in course.legs_idx:
-            seg = course.df_res.iloc[a:b + 1]
-            _, gain_m, *_ = segment_stats(seg)
-            leg_gains.append(gain_m)
+        # Per-segment pace and curve-based GAP
+        # Flat-equivalent distance: Σ(leg_meters[b] * flat_speed / speed[b])
+        # Altitude cancels in the ratio, so sea-level speeds are used directly.
+        speeds = pace_model.sea_level_speeds
+        pace_df = pace_model.pace_df
+        flat_idx = next(
+            (idx for idx, (lo, hi) in enumerate(zip(pace_df['lower_pct'], pace_df['upper_pct'])) if lo <= 0 < hi),
+            len(speeds) // 2
+        )
+        flat_speed_mps = speeds[flat_idx]
+
+        def curve_gap_km(leg_meters_arr):
+            d_flat_m = sum(
+                leg_meters_arr[b] * flat_speed_mps / speeds[b]
+                for b in range(min(len(leg_meters_arr), len(speeds)))
+                if speeds[b] > 0
+            )
+            return d_flat_m / 1000.0
 
         avg_paces = []
         gaps = []
@@ -172,18 +184,20 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
         for i in range(n_cp):
             leg_run_s = running_only[i] - prev_run
             leg_km = course.leg_end_km[i] - prev_km
-            gain_m = leg_gains[i] if i < len(leg_gains) else 0.0
-            gap_km = leg_km + gain_m * 0.01
             avg_paces.append(fmt_pace(leg_run_s / leg_km) if leg_km > 0 else "-")
-            gaps.append(fmt_pace(leg_run_s / gap_km) if gap_km > 0 else "-")
+            if i < len(course.legs_meters):
+                gap_km = curve_gap_km(course.legs_meters[i])
+                gaps.append(fmt_pace(leg_run_s / gap_km) if gap_km > 0 else "-")
+            else:
+                gaps.append("-")
             prev_run = running_only[i]
             prev_km = course.leg_end_km[i]
 
         # Total row
         total_run_s = running_only[-1]
         total_km = course.total_km
-        total_gain_m = sum(leg_gains)
         total_rest_s = sum(rests)
+        total_gap_km = sum(curve_gap_km(course.legs_meters[i]) for i in range(len(course.legs_meters)))
         total_row = {
             "Checkpoint": "Total",
             "Distance (km)": round(total_km, 1),
@@ -191,7 +205,7 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
             "Departure (P50)": format_seconds(p50[-1]),
             "Rest": fmt_rest(total_rest_s),
             "Avg Pace": fmt_pace(total_run_s / total_km) if total_km > 0 else "-",
-            "GAP": fmt_pace(total_run_s / (total_km + total_gain_m * 0.01)) if total_km > 0 else "-",
+            "GAP": fmt_pace(total_run_s / total_gap_km) if total_gap_km > 0 else "-",
             "Optimistic (P25)": format_seconds(results["p25"][-1]),
             "Pessimistic (P75)": format_seconds(results["p75"][-1]),
         }

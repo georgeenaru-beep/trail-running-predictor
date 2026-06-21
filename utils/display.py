@@ -394,7 +394,10 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
         )
         if "gain_m" in display_df.columns:
             display_df["GAP"] = display_df.apply(
-                lambda r: _fmt_pace(r[time_col] / (r["distance_km"] + r["gain_m"] * 0.01))
+                lambda r: _fmt_pace(r[time_col] / max(
+                    r["distance_km"] + r["gain_m"] * 0.01 - (r["loss_m"] if "loss_m" in r.index and pd.notna(r["loss_m"]) else 0) * 0.005,
+                    r["distance_km"] * 0.5
+                ))
                 if pd.notna(r[time_col]) and r["distance_km"] > 0 and pd.notna(r["gain_m"]) else "-",
                 axis=1
             )
