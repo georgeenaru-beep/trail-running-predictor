@@ -379,7 +379,25 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
             lambda v: f"{int(v)}" if pd.notna(v) else ""
         )
 
-    cols = ['name', 'date', 'distance_km', 'time', 'type', 'avg HR', 'rel effort', 'Exclude']
+    def _fmt_pace(sec_per_km):
+        m = int(sec_per_km // 60)
+        s = int(sec_per_km % 60)
+        return f"{m}:{s:02d}"
+
+    if "elapsed_time_s" in display_df.columns and "distance_km" in display_df.columns:
+        display_df["avg pace"] = display_df.apply(
+            lambda r: _fmt_pace(r["elapsed_time_s"] / r["distance_km"])
+            if pd.notna(r["elapsed_time_s"]) and r["distance_km"] > 0 else "-",
+            axis=1
+        )
+        if "gain_m" in display_df.columns:
+            display_df["GAP"] = display_df.apply(
+                lambda r: _fmt_pace(r["elapsed_time_s"] / (r["distance_km"] + r["gain_m"] * 0.01))
+                if pd.notna(r["elapsed_time_s"]) and r["distance_km"] > 0 and pd.notna(r["gain_m"]) else "-",
+                axis=1
+            )
+
+    cols = ['name', 'date', 'distance_km', 'time', 'avg pace', 'GAP', 'type', 'avg HR', 'rel effort', 'Exclude']
     cols = [c for c in cols if c in display_df.columns]
 
     if not cols:

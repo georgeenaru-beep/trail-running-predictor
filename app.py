@@ -19,6 +19,7 @@ from utils.display import (
     display_model_metadata, format_seconds, display_pace_curve_analysis
 )
 from utils.prediction import run_prediction_simulation
+from utils.elevation import segment_stats
 from models import Course, PaceModel
 import config
 
@@ -151,15 +152,52 @@ def run_predictions_ui(course: Course, conditions: int, checkpoint_time_min: int
             m, sec = divmod(s, 60)
             return f"{m}:{sec:02d}" if s > 0 else "-"
 
+        def fmt_pace(sec_per_km):
+            sec_per_km = max(0, sec_per_km)
+            m = int(sec_per_km // 60)
+            s = int(sec_per_km % 60)
+            return f"{m}:{s:02d}"
+
+        # Per-leg elevation gain and pace/GAP
+        leg_gains = []
+        for a, b in course.legs_idx:
+            seg = course.df_res.iloc[a:b + 1]
+            _, gain_m, *_ = segment_stats(seg)
+            leg_gains.append(gain_m)
+
+        avg_paces = []
+        gaps = []
+        prev_run = 0.0
+        prev_km = 0.0
+        for i in range(n_cp):
+            leg_run_s = running_only[i] - prev_run
+            leg_km = course.leg_end_km[i] - prev_km
+            gain_m = leg_gains[i] if i < len(leg_gains) else 0.0
+            gap_km = leg_km + gain_m * 0.01
+            avg_paces.append(fmt_pace(leg_run_s / leg_km) if leg_km > 0 else "-")
+            gaps.append(fmt_pace(leg_run_s / gap_km) if gap_km > 0 else "-")
+            prev_run = running_only[i]
+            prev_km = course.leg_end_km[i]
+
+        # Overall race avg pace and GAP (running-only time, full distance/gain)
+        total_run_s = running_only[-1]
+        total_km = course.total_km
+        total_gain_m = sum(leg_gains)
+        overall_pace = fmt_pace(total_run_s / total_km) if total_km > 0 else "-"
+        overall_gap = fmt_pace(total_run_s / (total_km + total_gain_m * 0.01)) if total_km > 0 else "-"
+
         st.session_state.eta_results = pd.DataFrame({
             "Checkpoint": names,
             "Distance (km)": [round(x, 1) for x in course.leg_end_km],
             "Arrival (P50)": [format_seconds(x) for x in arrivals],
             "Departure (P50)": [format_seconds(x) for x in departures],
             "Rest": [fmt_rest(x) for x in rests],
+            "Avg Pace": avg_paces,
+            "GAP": gaps,
             "Optimistic (P25)": [format_seconds(x) for x in results["p25"]],
             "Pessimistic (P75)": [format_seconds(x) for x in results["p75"]],
         })
+        st.caption(f"Overall: avg pace {overall_pace} /km | GAP {overall_gap} /km (running time only, excl. aid station stops)")
 
         # Add helpful explanation
         st.info(
