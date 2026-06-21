@@ -353,13 +353,15 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
     # Add Exclude column based on current exclusions
     display_df["Exclude"] = display_df["id"].astype(str).isin(excluded_ids)
 
-    if "elapsed_time_s" in display_df.columns:
-        def _fmt_elapsed(s):
-            s = int(s)
-            h, rem = divmod(s, 3600)
-            m, sec = divmod(rem, 60)
-            return f"{h}:{m:02d}:{sec:02d}"
-        display_df["time"] = display_df["elapsed_time_s"].apply(
+    def _fmt_elapsed(s):
+        s = int(s)
+        h, rem = divmod(s, 3600)
+        m, sec = divmod(rem, 60)
+        return f"{h}:{m:02d}:{sec:02d}"
+
+    time_col = "moving_time_s" if "moving_time_s" in display_df.columns else "elapsed_time_s"
+    if time_col in display_df.columns:
+        display_df["time"] = display_df[time_col].apply(
             lambda s: _fmt_elapsed(s) if pd.notna(s) and s > 0 else ""
         )
 
@@ -384,16 +386,16 @@ def display_pace_model_races(pace_model, excluded_ids: set | None = None):
         s = int(sec_per_km % 60)
         return f"{m}:{s:02d}"
 
-    if "elapsed_time_s" in display_df.columns and "distance_km" in display_df.columns:
+    if time_col in display_df.columns and "distance_km" in display_df.columns:
         display_df["avg pace"] = display_df.apply(
-            lambda r: _fmt_pace(r["elapsed_time_s"] / r["distance_km"])
-            if pd.notna(r["elapsed_time_s"]) and r["distance_km"] > 0 else "-",
+            lambda r: _fmt_pace(r[time_col] / r["distance_km"])
+            if pd.notna(r[time_col]) and r["distance_km"] > 0 else "-",
             axis=1
         )
         if "gain_m" in display_df.columns:
             display_df["GAP"] = display_df.apply(
-                lambda r: _fmt_pace(r["elapsed_time_s"] / (r["distance_km"] + r["gain_m"] * 0.01))
-                if pd.notna(r["elapsed_time_s"]) and r["distance_km"] > 0 and pd.notna(r["gain_m"]) else "-",
+                lambda r: _fmt_pace(r[time_col] / (r["distance_km"] + r["gain_m"] * 0.01))
+                if pd.notna(r[time_col]) and r["distance_km"] > 0 and pd.notna(r["gain_m"]) else "-",
                 axis=1
             )
 

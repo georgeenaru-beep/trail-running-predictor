@@ -533,6 +533,7 @@ def _process_single_race(
 
     # Extract rest data from the same streams
     elapsed_time_s = int(activity.get("elapsed_time") or 0)
+    moving_time_s = int(activity.get("moving_time") or elapsed_time_s)
     distance_km = round(activity.get("distance", 0) / 1000.0, 2)
     rest_data = _extract_rest_data(streams, elapsed_time_s, distance_km)
 
@@ -546,6 +547,7 @@ def _process_single_race(
         "date": (activity.get("start_date", "") or "")[:10],
         "distance_km": distance_km,
         "elapsed_time_s": elapsed_time_s,
+        "moving_time_s": moving_time_s,
         "median_alt_m": median_alt,
         "weight": round(race_weight, 3),
         "gain_m": round(activity.get("total_elevation_gain") or 0),
@@ -733,7 +735,7 @@ def _fit_riegel_exponent(used_races_df: pd.DataFrame) -> Tuple[float, float, flo
 
     # Extract valid races
     distances = used_races_df["distance_km"].to_numpy(dtype=float)
-    times = used_races_df["elapsed_time_s"].to_numpy(dtype=float)
+    times = used_races_df["moving_time_s"].to_numpy(dtype=float)
     weights = used_races_df["weight"].to_numpy(dtype=float)
 
     valid_mask = (distances > 0) & (times > 0)
